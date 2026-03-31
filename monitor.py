@@ -167,10 +167,20 @@ class Monitor:
 
         self.state.cleanup_closed_positions({p.position_address for p in positions})
 
+        # Token base yang tidak perlu dicek holdernya (supply terlalu besar)
+        SKIP_HOLDER_MINTS = {
+            "So11111111111111111111111111111111111111112",  # Wrapped SOL
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+        }
+
         # Fetch top holders paralel jika Helius key tersedia
         holders_cache: dict[str, TopHoldersResult | None] = {}
         if self._holders_enabled:
-            mints = {p.token0_address for p in positions} | {p.token1_address for p in positions}
+            mints = (
+                {p.token0_address for p in positions} |
+                {p.token1_address for p in positions}
+            ) - SKIP_HOLDER_MINTS
             results = await asyncio.gather(
                 *[solana.get_top_holders(m, Config.HELIUS_API_KEY) for m in mints],
                 return_exceptions=True,
