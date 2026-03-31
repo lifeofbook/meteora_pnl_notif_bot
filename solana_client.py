@@ -30,15 +30,34 @@ class TopHoldersResult:
 async def get_top_holders(mint: str, helius_api_key: str, limit: int = 10) -> TopHoldersResult:
     """Ambil top N token holders via Solana RPC (Helius free)."""
     rpc_url = f"https://mainnet.helius-rpc.com/?api-key={helius_api_key}"
+    headers = {"Content-Type": "application/json"}
 
     async with httpx.AsyncClient(timeout=30) as client:
-        r_accounts, r_supply = await _batch_rpc(client, rpc_url, [
-            {"method": "getTokenLargestAccounts", "params": [mint, {"commitment": "finalized"}]},
-            {"method": "getTokenSupply", "params": [mint]},
-        ])
+        # Call terpisah (tidak batch) agar kompatibel dengan Helius free plan
+        r_accounts = await client.post(rpc_url, headers=headers, json={
+            "jsonrpc": "2.0", "id": 1,
+            "method": "getTokenLargestAccounts",
+            "params": [mint, {"commitment": "finalized"}]
+        })
+        r_accounts.raise_for_status()
 
-    total_supply = float(r_supply["result"]["value"]["uiAmount"] or 0)
-    raw_accounts = r_accounts["result"]["value"][:limit]
+        r_supply = await client.post(rpc_url, headers=headers, json={
+            "jsonrpc": "2.0", "id": 2,
+            "method": "getTokenSupply",
+            "params": [mint]
+        })
+        r_supply.raise_for_status()
+
+    supply_data = r_supply.json()
+    accounts_data = r_accounts.json()
+
+    if "error" in accounts_data:
+        raise Exception(f"RPC error: {accounts_data['error']}")
+    if "error" in supply_data:
+        raise Exception(f"RPC error: {supply_data['error']}")
+
+    total_supply = float(supply_data["result"]["value"]["uiAmount"] or 0)
+    raw_accounts = accounts_data["result"]["value"][:limit]
 
     holders = []
     for i, acc in enumerate(raw_accounts):
@@ -52,7 +71,7 @@ async def get_top_holders(mint: str, helius_api_key: str, limit: int = 10) -> To
         ))
 
     top10_pct = sum(h.percentage for h in holders)
-    logger.debug(f"Top 10 holders {mint[:8]}...: {top10_pct:.2f}%")
+    logger.info(f"Top 10 holders {mint[:8]}...: {top10_pct:.2f}%")
 
     return TopHoldersResult(
         token_address=mint,
@@ -60,12 +79,3 @@ async def get_top_holders(mint: str, helius_api_key: str, limit: int = 10) -> To
         top10_combined_pct=round(top10_pct, 4),
         holders=holders,
     )
-
-
-async def _batch_rpc(client: httpx.AsyncClient, url: str, calls: list) -> list:
-    """Kirim beberapa RPC call sekaligus (batch)."""
-    batch = [{"jsonrpc": "2.0", "id": i + 1, **call} for i, call in enumerate(calls)]
-    resp = await client.post(url, json=batch)
-    resp.raise_for_status()
-    results = sorted(resp.json(), key=lambda x: x["id"])
-    return results
