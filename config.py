@@ -5,11 +5,11 @@ load_dotenv()
 
 
 class Config:
-    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
-    WALLET_ADDRESS: str = os.getenv("WALLET_ADDRESS", "")
-    LPAGENT_API_KEY: str = os.getenv("LPAGENT_API_KEY", "")
-    HELIUS_API_KEY: str = os.getenv("HELIUS_API_KEY", "")  # gratis: dashboard.helius.dev
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    WALLET_ADDRESS: str = os.getenv("WALLET_ADDRESS", "").strip()
+    LPAGENT_API_KEY: str = os.getenv("LPAGENT_API_KEY", "").strip()
+    HELIUS_API_KEY: str = os.getenv("HELIUS_API_KEY", "").strip()
 
     CHECK_INTERVAL: int = int(os.getenv("CHECK_INTERVAL", "300"))
     PNL_THRESHOLD: float = float(os.getenv("PNL_THRESHOLD", "3.0"))
