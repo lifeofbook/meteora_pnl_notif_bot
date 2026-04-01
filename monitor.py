@@ -40,6 +40,54 @@ def _pnl_emoji(pnl: float) -> str:
     return "🟡"
 
 
+def _price_range_info(
+    price_lower: float,
+    price_upper: float,
+    price_current: float,
+) -> "tuple | None":
+    """
+    Hitung posisi harga dalam range dan estimasi komposisi likuiditas.
+
+    Model linear DLMM:
+      - Di batas bawah (0%) → semua likuiditas dalam token0 (meme token), 0% SOL
+      - Di batas atas (100%) → semua likuiditas dalam SOL, 0% token0
+    Semakin tinggi posisi → makin banyak SOL, token0 makin habis terjual.
+    """
+    span = price_upper - price_lower
+    if span <= 0:
+        return None
+
+    position_pct = (price_current - price_lower) / span * 100
+    position_pct = max(0.0, min(100.0, position_pct))
+
+    # Komposisi estimasi (linear)
+    sol_pct = position_pct          # token1/SOL
+    token_pct = 100 - position_pct  # token0
+
+    # Status berdasarkan seberapa dekat ke batas
+    if position_pct <= 10:
+        status_emoji = "🔴"
+        status_text = "KRITIS — Hampir keluar range BAWAH"
+    elif position_pct <= 25:
+        status_emoji = "🟠"
+        status_text = "BAHAYA — Mendekati batas bawah"
+    elif position_pct >= 90:
+        status_emoji = "🔴"
+        status_text = "KRITIS — Hampir keluar range ATAS"
+    elif position_pct >= 75:
+        status_emoji = "🟠"
+        status_text = "BAHAYA — Mendekati batas atas"
+    else:
+        status_emoji = "🟢"
+        status_text = "AMAN — Di tengah range"
+
+    # Visual bar 20 karakter
+    filled = round(position_pct / 100 * 20)
+    bar = "█" * filled + "░" * (20 - filled)
+
+    return position_pct, sol_pct, token_pct, status_emoji, status_text, bar
+
+
 def _e(text: str) -> str:
     """Escape semua karakter khusus MarkdownV2 Telegram."""
     for c in r"_*[]()~`>#+-=|{}.!":
@@ -77,13 +125,28 @@ def _build_message(
     ]
 
     if pos.price_lower is not None and pos.price_upper is not None:
+        current_price = pos.price_current or 0
+        rng = _price_range_info(pos.price_lower, pos.price_upper, current_price)
+
         lines += [
             f"📊 *Price Range*",
             f"  Bawah:    `{_e(_fmt(pos.price_lower, 8))}`",
             f"  Atas:     `{_e(_fmt(pos.price_upper, 8))}`",
-            f"  Sekarang: `{_e(_fmt(pos.price_current or 0, 8))}`",
+            f"  Sekarang: `{_e(_fmt(current_price, 8))}`",
             "",
         ]
+
+        if rng:
+            position_pct, sol_pct, token_pct, status_emoji, status_text, bar = rng
+            pos_str    = f"{position_pct:.1f}"
+            sol_str    = f"{sol_pct:.1f}"
+            token_str  = f"{token_pct:.1f}"
+            lines += [
+                f"  `{bar}` {_e(pos_str)}%",
+                f"  {status_emoji} *{_e(status_text)}*",
+                f"  {_e(pos.token1_symbol)}: `{_e(sol_str)}%` \\| {_e(pos.token0_symbol)}: `{_e(token_str)}%`",
+                "",
+            ]
 
     lines += [
         f"📈 *P&L \\(SOL\\)*",
