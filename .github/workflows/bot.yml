@@ -12,7 +12,7 @@ jobs:
   run-bot:
     runs-on: ubuntu-latest
     permissions:
-      contents: write         # perlu untuk commit state.json
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -40,10 +40,22 @@ jobs:
           CHECK_INTERVAL: "300"
         run: python main.py --once
 
-      - name: Simpan state ke repo
+      - name: Simpan state dan heartbeat ke repo
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/state.json 2>/dev/null || true
-          git diff --staged --quiet || git commit -m "chore: update bot state [skip ci]"
+          # Selalu update heartbeat agar repo tetap aktif (cegah throttle GitHub)
+          echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > data/heartbeat.txt
+          git add data/state.json data/heartbeat.txt 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: bot heartbeat [skip ci]"
           git push || true
+
+  # Job keepalive: jalankan setiap hari untuk mencegah GitHub menonaktifkan workflow
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep workflow aktif
+        uses: gautamkrishnar/keepalive-workflow@v2
