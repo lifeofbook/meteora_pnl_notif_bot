@@ -50,12 +50,15 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: bot heartbeat [skip ci]"
           git push || true
 
-  # Job keepalive: jalankan setiap hari untuk mencegah GitHub menonaktifkan workflow
+  # Job keepalive: re-enable workflow jika GitHub sempat menonaktifkannya
   keepalive:
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Keep workflow aktif
-        uses: gautamkrishnar/keepalive-workflow@v2
+      - name: Re-enable scheduled workflow
+        run: |
+          gh api -X PUT repos/${{ github.repository }}/actions/workflows/bot.yml/enable \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
