@@ -47,9 +47,13 @@
     ]
   },
   "pos_AxGYPoyMomqnaLxro2YgFSxDvuJyDSqRKEHePcCSsVSH": {
-    "pnl_notified": []
+    "pnl_notified": [
+      "-3.0"
+    ]
   },
   "pos_BesJGTonwPaKW9dDyVKuXzMiU26QJ63y6jnnkbqhut6U": {
-    "pnl_notified": []
+    "pnl_notified": [
+      "+3.0"
+    ]
   }
 }
